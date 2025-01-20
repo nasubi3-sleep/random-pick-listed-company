@@ -1,0 +1,27 @@
+{
+    "name": "Go AWS Lambda Development",
+    "image": "mcr.microsoft.com/vscode/devcontainers/go:latest",
+    "features": {
+      "go": "latest",
+      "aws-cli": "latest",
+      "docker-in-docker": "latest"
+    },
+    "postCreateCommand": [
+      "go get github.com/aws/aws-sdk-go",
+      "go get github.com/360EntSecGroup-Skylar/excelize/v2"
+    ],
+    "mounts": [
+      "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+    ],
+    "settings": {
+      "go.gopath": "/go",
+      "go.goroot": "/usr/local/go",
+      "go.useLanguageServer": true
+    },
+    "extensions": [
+      "ms-vscode.go",
+      "amazonwebservices.aws-toolkit-vscode"
+    ],
+    "forwardPorts": [8080]
+  }
+  
