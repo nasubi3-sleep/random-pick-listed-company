@@ -2,10 +2,16 @@
     "name": "Go AWS Lambda Development",
     "image": "mcr.microsoft.com/vscode/devcontainers/go:latest",
     "features": {
-      "go": "latest",
-      "aws-cli": "latest",
-      "docker-in-docker": "latest"
-    },
+        "ghcr.io/devcontainers/features/go": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/aws-cli": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/docker-in-docker": {
+            "version": "latest"
+        }
+    } ,
     "postCreateCommand": [
       "go get github.com/aws/aws-sdk-go",
       "go get github.com/360EntSecGroup-Skylar/excelize/v2"
