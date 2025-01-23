@@ -1,13 +1,15 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"math/rand"
-	"time"
-
 	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
 	"io"
+	"math/rand"
+	"net/http"
+	"os"
+	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
@@ -21,10 +23,145 @@ type Event struct {
 	Key    string `json:"key"`
 }
 
+// 認証用構造体
+type AuthRequest struct {
+	MailAddress string `json:"mailaddress"`
+	Password    string `json:"password"`
+}
+
+type AuthResponse struct {
+	RefreshToken string `json:"refreshToken"`
+}
+
+type IDTokenResponse struct {
+	IDToken string `json:"idToken"`
+}
+
+// J-Quants API用構造体
+type JQuantsResponse struct {
+	Info []struct {
+		Code             string `json:"Code"`
+		CompanyName      string `json:"CompanyName"`
+		MarketCodeName   string `json:"MarketCodeName"`
+		Sector33CodeName string `json:"Sector33CodeName"`
+	} `json:"info"`
+}
+
+// リフレッシュトークンを取得
+func GetRefreshToken(email, password string) (string, error) {
+	url := "https://api.jquants.com/v1/token/auth_user"
+	requestBody := AuthRequest{
+		MailAddress: email,
+		Password:    password,
+	}
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request data: %v", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to authenticate: status code %d", resp.StatusCode)
+	}
+
+	var authResponse AuthResponse
+	err = json.NewDecoder(resp.Body).Decode(&authResponse)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	return authResponse.RefreshToken, nil
+}
+
+// IDトークンを取得
+func GetIDToken(refreshToken string) (string, error) {
+	url := fmt.Sprintf("https://api.jquants.com/v1/token/auth_refresh?refreshtoken=%s", refreshToken)
+
+	resp, err := http.Post(url, "application/json", nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to get ID token: status code %d", resp.StatusCode)
+	}
+
+	var idTokenResponse IDTokenResponse
+	err = json.NewDecoder(resp.Body).Decode(&idTokenResponse)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	return idTokenResponse.IDToken, nil
+}
+
+// J-Quants APIから銘柄情報を取得
+func FetchCompanyInfo(code string, idToken string) (JQuantsResponse, error) {
+	apiURL := "https://api.jquants.com/v1/listed/info"
+
+	// APIリクエストの作成
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return JQuantsResponse{}, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	// クエリパラメータとヘッダーを設定
+	q := req.URL.Query()
+	q.Add("code", code)
+	req.URL.RawQuery = q.Encode()
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", idToken))
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return JQuantsResponse{}, fmt.Errorf("failed to fetch data: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return JQuantsResponse{}, fmt.Errorf("failed to fetch data: status code %d", resp.StatusCode)
+	}
+
+	var result JQuantsResponse
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return JQuantsResponse{}, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	return result, nil
+}
+
 func handler(ctx context.Context, event Event) (string, error) {
+	// 環境変数から認証情報を取得
+	email := os.Getenv("JQUANTS_EMAIL")
+	password := os.Getenv("JQUANTS_PASSWORD")
+
+	if email == "" || password == "" {
+		return "", fmt.Errorf("email or password not set in environment variables")
+	}
+
+	// リフレッシュトークンを取得
+	refreshToken, err := GetRefreshToken(email, password)
+	if err != nil {
+		return "", fmt.Errorf("failed to get refresh token: %v", err)
+	}
+
+	// IDトークンを取得
+	idToken, err := GetIDToken(refreshToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to get ID token: %v", err)
+	}
+
 	// S3の設定
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String("ap-northeast-1"), // 必要に応じて変更
+		Region: aws.String("ap-northeast-1"),
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to create AWS session: %v", err)
@@ -58,7 +195,7 @@ func handler(ctx context.Context, event Event) (string, error) {
 	// B2～B3847を抽出
 	var values []string
 	for _, sheet := range xlFile.Sheets {
-		for i := 1; i < 3847; i++ { // 行は0インデックスベース
+		for i := 1; i < 3847; i++ {
 			cell := sheet.Cell(i, 1) // B列は1インデックス
 			if cell != nil {
 				values = append(values, cell.String())
@@ -73,9 +210,22 @@ func handler(ctx context.Context, event Event) (string, error) {
 
 	// ランダムに値を選択
 	rand.Seed(time.Now().UnixNano())
-	randomValue := values[rand.Intn(len(values))]
+	randomCode := values[rand.Intn(len(values))]
 
-	return randomValue, nil
+	// J-Quants APIを呼び出して銘柄情報を取得
+	info, err := FetchCompanyInfo(randomCode, idToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch company info: %v", err)
+	}
+
+	// 結果をフォーマットして返す
+	if len(info.Info) > 0 {
+		company := info.Info[0]
+		return fmt.Sprintf("Code: %s, Name: %s, Market: %s, Sector: %s",
+			company.Code, company.CompanyName, company.MarketCodeName, company.Sector33CodeName), nil
+	}
+
+	return "No company information found", nil
 }
 
 func main() {
