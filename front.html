@@ -30,16 +30,16 @@
   </style>
 </head>
 <body>
-  <h1>Stock Information Viewer</h1>
-  <button id="fetchButton">Get Stock Info</button>
+  <h1>今日のラッキー上場企業を探してみよう</h1>
+  <button id="fetchButton">上場銘柄ランダム出力</button>
   <div id="result"></div>
 
   <script>
     const apiEndpoint = "https://<API_GATEWAY_ENDPOINT>"; // API Gatewayのエンドポイントをここに記入
 
     document.getElementById("fetchButton").addEventListener("click", async () => {
-      const bucket = "your-bucket-name"; // バケット名を記入
-      const key = "your-file-key"; // ファイルキーを記入
+      const bucket = "kisama2000-investment-bucket";
+      const key = "listed_companies.xlsx";
 
       // APIリクエスト
       try {
