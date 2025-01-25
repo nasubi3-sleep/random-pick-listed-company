@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Info Viewer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      text-align: center;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>Stock Information Viewer</h1>
+  <button id="fetchButton">Get Stock Info</button>
+  <div id="result"></div>
+
+  <script>
+    const apiEndpoint = "https://<API_GATEWAY_ENDPOINT>"; // API Gatewayのエンドポイントをここに記入
+
+    document.getElementById("fetchButton").addEventListener("click", async () => {
+      const bucket = "your-bucket-name"; // バケット名を記入
+      const key = "your-file-key"; // ファイルキーを記入
+
+      // APIリクエスト
+      try {
+        const response = await fetch(apiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ bucket, key }) // バケットとキーを送信
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        document.getElementById("result").textContent = `Response: ${JSON.stringify(data)}`;
+      } catch (error) {
+        document.getElementById("result").textContent = `Error: ${error.message}`;
+      }
+    });
+  </script>
+</body>
+</html>
