@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +11,7 @@
       margin: 2rem;
       text-align: center;
     }
+
     button {
       padding: 10px 20px;
       font-size: 16px;
@@ -19,48 +21,108 @@
       border-radius: 5px;
       cursor: pointer;
     }
+
     button:hover {
       background-color: #0056b3;
     }
+
     #result {
       margin-top: 20px;
       font-size: 18px;
       color: #333;
     }
+
+    table {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      border-collapse: collapse;
+      border: 1px solid #ddd;
+      background-color: #f9f9f9;
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f4f4f4;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
   </style>
 </head>
+
 <body>
   <h1>今日のラッキー上場企業を探してみよう</h1>
   <button id="fetchButton">上場銘柄ランダム出力</button>
   <div id="result"></div>
+  <table>
+    <thead>
+      <tr>
+        <th>項目</th>
+        <th>結果</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>証券コード</td>
+        <td id="value-code">--</td>
+      </tr>
+      <tr>
+        <td>会社名</td>
+        <td id="value-company-name">--</td>
+      </tr>
+      <tr>
+        <td>マーケット</td>
+        <td id="value-market-code-name">--</td>
+      </tr>
+      <tr>
+        <td>分類</td>
+        <td id="value-sector33-code-name">--</td>
+      </tr>
+    </tbody>
+  </table>
 
   <script>
-    const apiEndpoint = "https://<API_GATEWAY_ENDPOINT>"; // API Gatewayのエンドポイントをここに記入
+    const apiEndpoint = "https://2dhuxmwsl5.execute-api.ap-northeast-1.amazonaws.com/default/random-pick-listed-companies-v2"; // API Gatewayのエンドポイント
 
     document.getElementById("fetchButton").addEventListener("click", async () => {
-      const bucket = "kisama2000-investment-bucket";
-      const key = "listed_companies.xlsx";
-
-      // APIリクエスト
       try {
         const response = await fetch(apiEndpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ bucket, key }) // バケットとキーを送信
+          body: null
         });
 
         if (!response.ok) {
-          throw new Error(`Error: ${response.status}`);
+          throw new Error(`HTTPエラー: ${response.status}`);
         }
 
+        // レスポンスをJSONとして取得
         const data = await response.json();
-        document.getElementById("result").textContent = `Response: ${JSON.stringify(data)}`;
+        console.log("Parsed JSON:", data); // サーバーからのJSONレスポンスをそのまま使用
+
+        // JSONデータを更新
+        document.getElementById("value-code").textContent = data.Code || "--";
+        document.getElementById("value-company-name").textContent = data.CompanyName || "--";
+        document.getElementById("value-market-code-name").textContent = data.MarketCodeName || "--";
+        document.getElementById("value-sector33-code-name").textContent = data.Sector33CodeName || "--";
       } catch (error) {
+        console.error("エラー:", error);
         document.getElementById("result").textContent = `Error: ${error.message}`;
       }
     });
   </script>
+
+
 </body>
+
 </html>
