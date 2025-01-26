@@ -138,7 +138,7 @@ func FetchCompanyInfo(code string, idToken string) (JQuantsResponse, error) {
 	return result, nil
 }
 
-func handler(ctx context.Context, event Event) (string, error) {
+func handler(ctx context.Context, event Event) (interface{}, error) {
 	// 環境変数から認証情報を取得
 	email := os.Getenv("JQUANTS_EMAIL")
 	password := os.Getenv("JQUANTS_PASSWORD")
@@ -164,7 +164,7 @@ func handler(ctx context.Context, event Event) (string, error) {
 		Region: aws.String("ap-northeast-1"),
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to create AWS session: %v", err)
+		return "", fmt.Errorf("failed to create AWS session: %v", err) 
 	}
 
 	s3Client := s3.New(sess)
@@ -221,11 +221,11 @@ func handler(ctx context.Context, event Event) (string, error) {
 	// 結果をフォーマットして返す
 	if len(info.Info) > 0 {
 		company := info.Info[0]
-		return fmt.Sprintf("Code: %s, Name: %s, Market: %s, Sector: %s",
-			company.Code, company.CompanyName, company.MarketCodeName, company.Sector33CodeName), nil
+		// company をそのまま返す
+		return company, nil
 	}
 
-	return "No company information found", nil
+	return nil, fmt.Errorf("No company information found")
 }
 
 func main() {
